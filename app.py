@@ -21,7 +21,7 @@ div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
     color: white !important; 
     border: none !important;
     font-weight: bold !important;
-    margin-top: 27px; /* ปรับให้พอดีกับ label ของ uploader */
+    margin-top: 23px; /* ปรับให้พอดีกับ label ของ uploader */
 }
 div[data-testid="stHorizontalBlock"] > div:nth-child(2) button:hover {
     background-color: #FF6B6B !important; 
