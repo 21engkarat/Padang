@@ -93,7 +93,8 @@ with st.sidebar:
         }
 
     )
-
+if "my_date" not in st.session_state:
+    st.session_state["my_date"] = datetime.now().date()
 
 # =========================================================
 
@@ -129,7 +130,7 @@ if menu == "ตรวจสอบวันครบกำหนด":
 
     today = datetime.now()
 
-    check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ", value=st.session_state.get("my_date", datetime.now().date()),key="my_date"
+    check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ", value=st.session_state.get("my_date", datetime.now().date()),key="my_date")
 
 
     th_day = check_date.day
