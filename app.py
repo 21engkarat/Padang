@@ -121,7 +121,7 @@ if "my_date" not in st.session_state:
 
 if menu == "ตรวจสอบวันครบกำหนด":
 
-    st.title("🚗🏍️ ตรวจสอบวันครบกำหนด")
+    st.title("🚗 ตรวจสอบวันครบกำหนด")
 
     st.write("ระบบตรวจเช็ครายงานยานพาหนะต่างประเทศกลับออกจากราชอาณาจักรเกินกำหนดเวลา")
 
@@ -178,7 +178,7 @@ if menu == "ตรวจสอบวันครบกำหนด":
 
     with col2:
 
-        st.button("🧹 Clear", on_click=clear_data, use_container_width=True)
+        st.button("✖️ Clear", on_click=clear_data, use_container_width=True)
 
 
 if uploaded_file is not None:
