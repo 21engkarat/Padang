@@ -39,7 +39,7 @@ thai_months = [
 
 # 1. วันที่ตรวจสอบ
 today = datetime.now()
-check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ", today)
+check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ (💡 ทดลองเปลี่ยนเป็น ก.ย. 2569 เพื่อทดสอบแจ้งเตือน)", today)
 
 th_day = check_date.day
 th_month = thai_months[check_date.month - 1]
@@ -61,57 +61,68 @@ with col2:
     st.write(" ") 
     st.button("🧹 Clear", on_click=clear_data, use_container_width=True)
 
-# 3. ประมวลผล PDF
+# 3. ประมวลผล PDF ด้วย Text Scanner (แก้อาการหาข้อมูลไม่เจอ)
 if uploaded_file is not None:
-    # 🔥 FIX BUK: สั่งให้ระบบย้อนกลับไปอ่านบรรทัดแรกของไฟล์ใหม่เสมอ 
-    # ป้องกันบั๊กเวลาผู้ใช้เปลี่ยนวันที่บนหน้าเว็บ
     uploaded_file.seek(0)
-    
     overdue_list = []
     total_records = 0
     
-    with st.spinner("⏳ ระบบกำลังอ่านไฟล์ PDF และประกอบร่างข้อมูล กรุณารอสักครู่..."):
-        records = []
-        current_rec = None
+    with st.spinner("⏳ ระบบกำลังอ่านไฟล์ PDF ด้วยโหมดสแกนข้อความขั้นสูง กรุณารอสักครู่..."):
+        raw_text_all = ""
         
+        # กวาดตัวหนังสือทั้งหมดออกมาจาก PDF
         with pdfplumber.open(uploaded_file) as pdf:
             for page in pdf.pages:
-                tables = page.extract_tables()
-                for table in tables:
-                    for row in table:
-                        clean_row = [str(item).replace('\n', ' ').strip() if item else "" for item in row]
-                        row_str = " | ".join(clean_row)
-                        
-                        # ค้นหาเลขใบขนสินค้า
-                        ใบขน_match = re.search(r'(\d{4}\s*-\s*\d\s*-\s*\d{4}\s*-\s*\d{5})', row_str)
-                        
-                        if ใบขน_match:
-                            if current_rec:
-                                records.append(current_rec)
-                            
-                            all_dates = re.findall(r'(\d{1,2}[/-]\d{1,2}[/-]\d{4})', row_str)
-                            due_date = all_dates[-1] if all_dates else ""
-                            
-                            current_rec = {
-                                "ลำดับ": str(len(records) + 1),
-                                "เลขที่ใบขน": ใบขน_match.group(1).replace(' ', ''),
-                                "ชื่อผู้นำเข้า": clean_row[2] if len(clean_row) > 2 else "",
-                                "ทะเบียน": "",
-                                "วันครบกำหนด": due_date,
-                                "raw_text": row_str
-                            }
-                        elif current_rec:
-                            current_rec["raw_text"] += " " + row_str
-                            if len(clean_row) > 3:
-                                for cell in clean_row[3:6]:
-                                    if cell and len(cell) <= 10 and re.search(r'[A-Za-z]', cell) and re.search(r'\d', cell):
-                                        if not current_rec["ทะเบียน"]:
-                                            current_rec["ทะเบียน"] = cell
-                                            
-        if current_rec:
-            records.append(current_rec)
+                text = page.extract_text()
+                if text:
+                    # ตัดข้อความหัวกระดาษและท้ายกระดาษทิ้ง เพื่อไม่ให้ระบบดึงวันที่พิมพ์เอกสารมาปน
+                    text = re.sub(r'กรมศุลกากร.*?\n', '', text)
+                    text = re.sub(r'รายงานยานพาหนะ.*?\n', '', text)
+                    text = re.sub(r'ด่านศุลกากร.*?\n', '', text)
+                    text = re.sub(r'ตั้งแต่วันที่.*?\n', '', text)
+                    text = re.sub(r'หน้าที่.*?\n', '', text)
+                    text = re.sub(r'วันที่ \d{2}/\d{2}/\d{4}.*?\n', '', text)
+                    text = re.sub(r'เวลา \d{2}:\d{2}:\d{2} น\..*?\n', '', text)
+                    raw_text_all += text + "\n"
         
-        # 4. ตรวจเช็ควันครบกำหนด
+        # ใช้ Regex ค้นหา "เลขที่ใบขนสินค้า" เพื่อใช้เป็นจุดตัดแยกข้อมูลรถแต่ละคัน
+        matches = list(re.finditer(r'(\d{4}-\d-\d{4}-\d{5})', raw_text_all))
+        
+        records = []
+        for i, match in enumerate(matches):
+            dec_num = match.group(1)
+            start_idx = match.end()
+            # ตัดข้อความเฉพาะช่วงของรถคันนั้นๆ (ถึงคันถัดไป)
+            end_idx = matches[i+1].start() if i+1 < len(matches) else len(raw_text_all)
+            
+            chunk = raw_text_all[start_idx:end_idx]
+            
+            # ดึงวันที่ทั้งหมดออกมาจากบล็อกข้อมูล วันที่อันสุดท้ายคือ "วันครบกำหนด" เสมอ
+            dates = re.findall(r'(\d{2}/\d{2}/\d{4})', chunk)
+            due_date = dates[-1] if dates else ""
+            
+            # สแกนหาป้ายทะเบียนรถ (ตัวอักษรภาษาอังกฤษ/ไทย ตามด้วยตัวเลข)
+            plate_match = re.search(r'\b([A-Z]{1,3}\s*\d{1,4})\b', chunk)
+            plate = plate_match.group(1) if plate_match else ""
+            if not plate:
+                plate_match_th = re.search(r'([ก-ฮ]{1,2}\s*\d{1,4})', chunk)
+                plate = plate_match_th.group(1) if plate_match_th else "มีในเอกสาร"
+            
+            # สแกนหาชื่อผู้นำเข้า
+            lines = [l.strip() for l in chunk.split('\n') if l.strip()]
+            name = lines[0] if lines else "ไม่ระบุ"
+            name = re.sub(r'^\d+\s*', '', name)
+            
+            records.append({
+                "ลำดับ": str(i + 1),
+                "เลขที่ใบขน": dec_num,
+                "ชื่อผู้นำเข้า": name[:30],
+                "ทะเบียน": plate,
+                "วันครบกำหนด": due_date,
+                "raw_text": chunk
+            })
+        
+        # 4. ตรวจเช็ควันครบกำหนดเปรียบเทียบกับวันที่เลือกรันระบบ
         for rec in records:
             if rec["วันครบกำหนด"]:
                 try:
@@ -130,7 +141,7 @@ if uploaded_file is not None:
                             "ลำดับ": rec["ลำดับ"],
                             "เลขที่ใบขน": rec["เลขที่ใบขน"],
                             "ชื่อผู้นำเข้า": rec["ชื่อผู้นำเข้า"],
-                            "ทะเบียน": rec["ทะเบียน"] if rec["ทะเบียน"] else "ระบุในเอกสาร",
+                            "ทะเบียน": rec["ทะเบียน"],
                             "วันครบกำหนด": rec["วันครบกำหนด"]
                         })
                 except Exception:
@@ -139,11 +150,10 @@ if uploaded_file is not None:
     # 5. แสดงผลลัพธ์
     st.markdown("---")
     
-    # ดักจับว่าระบบอ่านไฟล์ PDF ออกมาได้กี่คัน
     if total_records == 0:
-        st.error("❌ ระบบไม่สามารถดึงข้อมูลจาก PDF ได้ กรุณากดปุ่ม Clear สีแดง แล้วลองอัปโหลดไฟล์เข้าไปใหม่อีกครั้งครับ")
+        st.error("❌ ระบบยังคงอ่านไฟล์ไม่ได้ โปรดตรวจสอบว่าไฟล์ PDF มีการเข้ารหัสผ่านไว้หรือไม่")
     else:
-        st.subheader(f"📊 ผลการตรวจสอบข้อมูล (อ่านเอกสารสำเร็จทั้งหมด {total_records} คัน)")
+        st.subheader(f"📊 ผลการตรวจสอบข้อมูล (แกะข้อความสำเร็จทั้งหมด {total_records} คัน)")
         
         if overdue_list:
             df_overdue = pd.DataFrame(overdue_list)
