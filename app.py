@@ -4,19 +4,17 @@ import pandas as pd
 from datetime import datetime
 
 # ตั้งค่าหน้าเว็บให้แสดงผลแบบกว้างและใส่ไอคอนหน้าแท็บ
-st.set_page_config(page_title="ตรวจสอบวันครบกำหนด", layout="wide", page_icon="🚗")
+st.set_page_config(page_title="ระบบตรวจสอบวันครบกำหนด", layout="wide", page_icon="🚗")
 
-# ตกแต่งส่วนหัวด้วยอิโมจิยานพาหนะต่างๆ 🏍️🚗
+# ตกแต่งส่วนหัวด้วยอิโมจิยานพาหนะต่างๆ 🚗🏍️
 st.title("🚗🏍️ ตรวจสอบวันครบกำหนด")
 st.write("ระบบตรวจเช็ครายงานยานพาหนะต่างประเทศกลับออกจากราชอาณาจักรเกินกำหนดเวลา")
 
 # --- ระบบปุ่ม Clear (ล้างข้อมูล) ---
-# ใช้ Session State ของ Streamlit เพื่อจดจำสถานะการรีเซ็ตข้อมูล
 if "file_uploader_key" not in st.session_state:
     st.session_state["file_uploader_key"] = 0
 
 def clear_data():
-    # เปลี่ยน Key ของตัวอัปโหลดไฟล์เพื่อบังคับให้ล้างไฟล์เก่าทิ้ง
     st.session_state["file_uploader_key"] += 1
     st.success("🧹 ล้างข้อมูลเรียบร้อยแล้ว!")
 
@@ -42,7 +40,6 @@ today_th = datetime(th_year, check_date.month, check_date.day)
 # 2. ส่วนของปุ่มควบคุมการอัปโหลดและการล้างข้อมูล
 col1, col2 = st.columns([6, 1])
 with col1:
-    # เพิ่ม key เข้าไปที่ตัว uploader เพื่อให้สามารถสั่งรีเซ็ตค่าได้จากฟังก์ชัน clear_data
     uploaded_file = st.file_uploader(
         "ลากและวางไฟล์ PDF ที่นี่", 
         type=["pdf"], 
@@ -75,9 +72,41 @@ if uploaded_file is not None:
                         # แยกประเภทรถตามแบรนด์หรือประเภทเพื่อใส่ไอคอนตกแต่งในตาราง
                         vehicle_brand = row[3].upper() if row[3] else ""
                         icon = "🚗"
-                        # ตรวจสอบรถจักรยานยนต์จากข้อมูลยี่ห้อ (เช่น HONDA WAVE, YAMAHA) หรือคำค้นหา
                         if "WAVE" in vehicle_brand or "YAMAHA" in vehicle_brand or "รถจักรยานยน" in str(row):
                             icon = "🏍️"
                         
                         # เงื่อนไข: วันครบกำหนด < วันที่รันระบบ (ผ่านมาแล้ว) = เกินกำหนดจริง
-                        if expiry_dateนด หรือเป็นวันปัจจุบัน)")
+                        if expiry_date < today_th:
+                            overdue_list.append({
+                                "ประเภท": icon,
+                                "ลำดับ": row[0].replace('\n', ' '),
+                                "เลขที่ใบขน": row[1].replace('\n', ' '),
+                                "ชื่อผู้นำเข้า": row[2].replace('\n', ' '),
+                                "ทะเบียน": row[3].replace('\n', ' '),
+                                "วันครบกำหนด": expiry_date_str
+                            })
+                    except Exception as e:
+                        continue
+
+    # 4. ส่วนการแสดงผลลัพธ์ (แก้ไขจุดบั๊กข้อความซ้อนเรียบร้อยครับ)
+    st.markdown("---")
+    header_text = f"📊 ผลการตรวจสอบข้อมูล (ตรวจพบพาหนะทั้งหมด {total_records} คัน)"
+    st.subheader(header_text)
+    
+    if overdue_list:
+        df_overdue = pd.DataFrame(overdue_list)
+        st.error(f"⚠️ พบรายการเกินกำหนดเวลาทั้งหมด {len(df_overdue)} รายการ (วันครบกำหนดมาก่อนวันที่รันระบบ)")
+        
+        # แสดงตารางข้อมูลบนหน้าเว็บ
+        st.dataframe(df_overdue, use_container_width=True)
+        
+        # ปุ่มดาวน์โหลดไฟล์รายงานออกเป็น Excel/CSV
+        csv = df_overdue.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 ดาวน์โหลดรายชื่อผู้เกินกำหนดเป็น CSV",
+            data=csv,
+            file_name=f"overdue_report_{th_day}_{th_month}_{th_year}.csv",
+            mime="text/csv",
+        )
+    else:
+        st.success("🟢 ไม่พบรายการที่เกินกำหนดเวลา (ทุกรายการยังอยู่ในกำหนด หรือเป็นวันปัจจุบัน)")
