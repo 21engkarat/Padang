@@ -280,7 +280,7 @@ if uploaded_file is not None:
                     
                     icon = "🚗"
                     if "YAMAHA" in raw_text.upper() or "WAVE" in raw_text.upper() or "รถจักรยานยน" in raw_text.replace(' ', ''):
-                        icon = "🏍️"
+                        icon = "🚲"
                         
                     if expiry_date_object < current_date_core:
                         overdue_list.append({
