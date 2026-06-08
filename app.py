@@ -8,16 +8,20 @@ from streamlit_option_menu import option_menu
 # 1. ตั้งค่าหน้าเว็บ
 st.set_page_config(page_title="ระบบตรวจสอบวันครบกำหนด", layout="centered", page_icon="🚗")
 
-# --- 🎨 ตกแต่ง UI ทั่วไป ---
+# --- 🎨 ตกแต่ง UI: ปรับปุ่ม Clear ให้สูงเท่าช่องอัปโหลด ---
 st.markdown("""
 <style>
 h1, h2, h3 { text-align: center !important; }
 .stMarkdown p { text-align: center; }
+
+/* ปรับปุ่ม Clear ให้มีความสูงเท่ากับช่อง file uploader */
 div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
+    height: 82px !important;
     background-color: #FF4B4B !important; 
     color: white !important; 
     border: none !important;
     font-weight: bold !important;
+    margin-top: 27px; /* ปรับให้พอดีกับ label ของ uploader */
 }
 div[data-testid="stHorizontalBlock"] > div:nth-child(2) button:hover {
     background-color: #FF6B6B !important; 
@@ -37,8 +41,9 @@ with st.sidebar:
         default_index=0,
         styles={
             "container": {"padding": "5!important", "background-color": "#FAFAFA"},
-            "icon": {"color": "#555", "font-size": "20px"}, 
-            # 🔥 จุดที่แก้ไข: เพิ่ม "color": "#333333" เพื่อบังคับให้ตัวหนังสือเมนูเป็นสีเข้ม
+            # ปรับสีไอคอนและตัวหนังสือหัวข้อเมนูให้เป็นสีเทาเข้ม
+            "menu-title": {"color": "#333333", "font-weight": "bold"},
+            "icon": {"color": "#333333", "font-size": "20px"}, 
             "nav-link": {"font-size": "16px", "text-align": "left", "margin":"0px", "--hover-color": "#EEEEEE", "color": "#333333"},
             "nav-link-selected": {"background-color": "#FF4B4B", "color": "white"}, 
         }
@@ -80,14 +85,11 @@ if menu == "ตรวจสอบวันครบกำหนด":
             key=f"uploader_{st.session_state['file_uploader_key']}"
         )
     with col2:
-        st.write(" ") 
-        st.write(" ") 
         st.button("🧹 Clear", on_click=clear_data, use_container_width=True)
 
     if uploaded_file is not None:
         uploaded_file.seek(0)
         
-        # Validation
         with pdfplumber.open(uploaded_file) as pdf:
             first_page_text = pdf.pages[0].extract_text()
             if not first_page_text or "รายงานยานพาหนะ" not in first_page_text.replace(' ', ''):
@@ -97,7 +99,7 @@ if menu == "ตรวจสอบวันครบกำหนด":
         overdue_list = []
         total_records = 0
         
-        with st.spinner("⏳ ระบบกำลังล็อกพิกัดตารางและสแกนข้อมูล กรุณารอสักครู่..."):
+        with st.spinner("⏳ ระบบกำลังล็อกพิกัดตารางและสแกนข้อมูล..."):
             records_data = []
             header_plate_x0 = 350 
             
@@ -126,7 +128,6 @@ if menu == "ตรวจสอบวันครบกำหนด":
                     if current_rec_words:
                         records_data.append(current_rec_words)
                         
-            # ประมวลผล
             for rec_words in records_data:
                 raw_text = " ".join([w['text'] for w in rec_words])
                 dec_num = rec_words[0]['text']
@@ -194,7 +195,6 @@ if menu == "ตรวจสอบวันครบกำหนด":
                     except Exception:
                         continue
 
-        # แสดงผลลัพธ์
         st.markdown("---")
         if total_records == 0:
             st.error("❌ ระบบไม่สามารถอ่านข้อมูลได้ กรุณากดปุ่ม Clear และอัปโหลดไฟล์ใหม่อีกครั้ง")
@@ -221,9 +221,6 @@ if menu == "ตรวจสอบวันครบกำหนด":
             else:
                 st.success(f"🟢 ไม่พบรายการที่เกินกำหนดเวลา (ทุกคันมีกำหนดออก หลังวันที่ {th_day} {th_month} {th_year})")
 
-# =========================================================
-# เมนูที่ 2: อื่นๆ
-# =========================================================
 elif menu == "อื่นๆ":
     st.title("📂 เมนูอื่นๆ")
     st.write("พื้นที่นี้ถูกจัดสรรไว้สำหรับพัฒนาฟังก์ชันหรือระบบงานอื่นเพิ่มเติมในอนาคต")
