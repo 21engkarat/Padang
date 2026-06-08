@@ -387,7 +387,7 @@ if menu == "ตรวจสอบวันครบกำหนด":
 
         else:
 
-            st.subheader(f"📊 ผลการตรวจสอบข้อมูล (รถจำนวน {total_records} คัน)")
+            st.subheader(f"📊 ผลการตรวจสอบข้อมูล (จำนวน {total_records} รายการ)")
 
             
 
