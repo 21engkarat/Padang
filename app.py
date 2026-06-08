@@ -129,8 +129,7 @@ if menu == "ตรวจสอบวันครบกำหนด":
 
     today = datetime.now()
 
-    check_date = st.date_input(
-    "เลือกวันที่ต้องการให้ตรวจเช็คระบบ", 
+    check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ", 
     value=st.session_state.get("my_date", datetime.now().date()),
     key="my_date"
 
