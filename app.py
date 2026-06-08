@@ -61,24 +61,22 @@ with col2:
     st.write(" ") 
     st.button("🧹 Clear", on_click=clear_data, use_container_width=True)
 
-# 3. ประมวลผล PDF ด้วยระบบ "วิเคราะห์พิกัดแกน X"
+# 3. ประมวลผล PDF
 if uploaded_file is not None:
     uploaded_file.seek(0)
     overdue_list = []
     total_records = 0
     
-    with st.spinner("⏳ ระบบกำลังวิเคราะห์พิกัดตารางบนหน้ากระดาษ กรุณารอสักครู่..."):
+    with st.spinner("⏳ ระบบกำลังสแกนและจับคู่พิกัดทะเบียนรถ กรุณารอสักครู่..."):
         records_data = []
         
         with pdfplumber.open(uploaded_file) as pdf:
             for page in pdf.pages:
-                # ดึงคำทั้งหมดพร้อมพิกัด (Bounding Box) บนหน้ากระดาษ
                 words = page.extract_words()
                 
                 current_rec_words = []
                 for w in words:
                     text = w['text'].strip()
-                    # ใช้ "เลขใบขนสินค้า" เป็นตัวแบ่งรถแต่ละคัน (เช่น 5901-7-6905-03632)
                     if re.match(r'^\d{4}-\d-\d{4}-\d{5}$', text):
                         if current_rec_words:
                             records_data.append(current_rec_words)
@@ -94,38 +92,64 @@ if uploaded_file is not None:
             raw_text = " ".join([w['text'] for w in rec_words])
             dec_num = rec_words[0]['text']
             
-            # 🎯 พระเอกของงาน: หา "วันครบกำหนด" โดยเช็คจากพิกัด
+            # --- 1. แกะวันครบกำหนด (ขวาสุด) ---
             dates = []
             for w in rec_words:
                 match = re.search(r'(\d{2}/\d{2}/\d{4})', w['text'])
                 if match:
-                    # เก็บวันที่ และ พิกัดแนวแกนขวาง (x0 คือพิกัดความไกลจากขอบซ้ายของกระดาษ)
                     dates.append({'date_str': match.group(1), 'x0': w['x0']})
             
             due_date = ""
             if dates:
-                # เลือกวันที่ที่อยู่ "ขวาสุดของกระดาษ" (ค่า x0 มากที่สุด = คอลัมน์สุดท้ายแน่นอน!)
                 rightmost_date = max(dates, key=lambda d: d['x0'])
                 due_date = rightmost_date['date_str']
                 
-            # ดึงชื่อผู้นำเข้า (อยู่ระหว่างเลขใบขน กับสัญชาติ)
+            # --- 2. แกะชื่อผู้นำเข้า ---
             name = "ไม่ระบุ"
             name_match = re.search(r'\d{4}-\d-\d{4}-\d{5}\s+(.*?)\s+(MALAYSIAN|THAI|\d{6,})', raw_text)
             if name_match:
                 name = name_match.group(1).strip()
                 
-            # สแกนทะเบียนรถ
+            # --- 3. 🔥 จุดแก้ไข: แกะทะเบียนรถด้วยระบบจับคู่แกน X ---
+            # ก. หากลุ่มคำที่เป็นยี่ห้อรถ เพื่อใช้เป็นเสาหลักพิกัด X
+            brand_list = ["HONDA", "TOYOTA", "PROTON", "PERODUA", "YAMAHA", "NISSAN", "BMW", "MERCEDES", "SUZUKI", "VOLKSWAGEN", "MITSUBISHI", "ISUZU", "NAZA", "FORD", "MAZDA"]
+            brand_x0 = None
+            for w in rec_words:
+                if any(b in w['text'].upper() for b in brand_list):
+                    brand_x0 = w['x0']
+                    break
+                    
             plate = ""
-            plate_match = re.search(r'\b([A-Z]{1,3}\s*\d{1,4})\b', raw_text)
-            if plate_match:
-                plate = plate_match.group(1)
-            else:
-                plate_match_th = re.search(r'([ก-ฮ]{1,2}\s*\d{1,4})', raw_text)
-                if plate_match_th:
-                    plate = plate_match_th.group(1)
-            if not plate:
-                plate = "มีในเอกสาร"
+            potential_plates = []
+            
+            # ข. หาคำทั้งหมดที่มีแพทเทิร์นคล้ายทะเบียนรถ
+            for w in rec_words:
+                clean_text = w['text'].replace('-', '').replace(' ', '').strip()
                 
+                # เช็คเงื่อนไข: อักษรนำ 1-3 ตัว + เลข 1-4 ตัว + (อาจมีอักษรตามท้าย 1 ตัว) หรือ ทะเบียนไทย
+                if re.match(r'^([A-Za-z]{1,3}\d{1,4}[A-Za-z]?|[ก-ฮ]{1,2}\d{1,4}|\d[ก-ฮ]{1,2}\d{1,4})$', clean_text):
+                    # กรองคำหลอก: ต้องมีความยาวรวม 4 ตัวขึ้นไป และต้องไม่ใช่ตัวเลขล้วน
+                    if len(clean_text) >= 4 and not clean_text.isdigit():
+                        potential_plates.append(w)
+            
+            # ค. ดึงทะเบียนที่พิกัด X ตรงกับเสาหลักยี่ห้อรถมากที่สุด
+            if potential_plates:
+                if brand_x0 is not None:
+                    best_w = min(potential_plates, key=lambda w: abs(w['x0'] - brand_x0))
+                    plate = best_w['text']
+                else:
+                    plate = potential_plates[0]['text']
+            
+            # กรณีหาไม่เจอจริงๆ ใช้แผนสำรอง
+            if not plate:
+                plate_match = re.search(r'\b([A-Z]{2,3}\s*\d{1,4}[A-Z]?)\b', raw_text)
+                if plate_match:
+                    plate = plate_match.group(1)
+                else:
+                    plate_match_th = re.search(r'([ก-ฮ]{1,2}\s*\d{1,4})', raw_text)
+                    plate = plate_match_th.group(1) if plate_match_th else "มีในเอกสาร"
+                    
+            # --- 4. เช็คสถานะ ---
             if due_date:
                 try:
                     total_records += 1
@@ -137,7 +161,6 @@ if uploaded_file is not None:
                     if "YAMAHA" in raw_text.upper() or "WAVE" in raw_text.upper() or "รถจักรยานยน" in raw_text.replace(' ', ''):
                         icon = "🏍️"
                         
-                    # เช็คเงื่อนไข: วันครบกำหนด < วันปัจจุบันที่เลือกรันระบบ
                     if expiry_date_object < current_date_core:
                         overdue_list.append({
                             "ลำดับ": str(total_records),
