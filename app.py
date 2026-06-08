@@ -14,7 +14,12 @@ from zoneinfo import ZoneInfo
 
 # 1. ตั้งค่าหน้าเว็บ
 
-st.set_page_config(page_title="ระบบตรวจสอบวันครบกำหนด", layout="centered", page_icon="🚗")
+st.set_page_config(
+    page_title="ระบบตรวจสอบวันครบกำหนด", 
+    layout="centered", 
+    page_icon="🚗",
+    initial_sidebar_state="collapsed"  # เพิ่มบรรทัดนี้เพื่อซ่อนเมนูตอนเริ่มต้น
+)
 
 
 # --- 🎨 ตกแต่ง UI: ปรับปุ่ม Clear ให้สูงเท่าช่องอัปโหลด ---
