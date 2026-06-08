@@ -16,7 +16,7 @@ h1, h2, h3 { text-align: center !important; }
 
 /* ปรับปุ่ม Clear ให้มีความสูงเท่ากับช่อง file uploader */
 div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
-    height: 82px !important;
+    height: 70px !important;
     background-color: #FF4B4B !important; 
     color: white !important; 
     border: none !important;
