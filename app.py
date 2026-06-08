@@ -116,7 +116,7 @@ if menu == "ตรวจสอบวันครบกำหนด":
     def clear_data():
 
         st.session_state["file_uploader_key"] += 1
-
+        st.session_state["my_date"] = datetime.now().date()
 
     thai_months = [
 
@@ -129,7 +129,10 @@ if menu == "ตรวจสอบวันครบกำหนด":
 
     today = datetime.now()
 
-    check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ", today)
+    check_date = st.date_input(
+    "เลือกวันที่ต้องการให้ตรวจเช็คระบบ", 
+    value=st.session_state.get("my_date", datetime.now().date()),
+    key="my_date"
 
 
     th_day = check_date.day
