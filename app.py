@@ -3,7 +3,7 @@ import pdfplumber
 import pandas as pd
 import re
 from datetime import datetime
-from streamlit_option_menu import option_menu  # นำเข้าไลบรารีสร้างเมนูสวยงาม
+from streamlit_option_menu import option_menu 
 
 # 1. ตั้งค่าหน้าเว็บ
 st.set_page_config(page_title="ระบบตรวจสอบวันครบกำหนด", layout="centered", page_icon="🚗")
@@ -30,16 +30,17 @@ div[data-testid="stHorizontalBlock"] > div:nth-child(2) button:hover {
 # =========================================================
 with st.sidebar:
     menu = option_menu(
-        menu_title="เมนู",  # เปลี่ยนชื่อหัวข้อตามที่ต้องการ
-        options=["ตรวจสอบวันครบกำหนด", "อื่นๆ"], # รายการเมนู
-        icons=["calendar2-check", "grid-1x2"], # ใส่ไอคอน (จากเว็บ Bootstrap Icons)
-        menu_icon="cast", # ไอคอนตรงหัวข้อเมนู
+        menu_title="เมนู",  
+        options=["ตรวจสอบวันครบกำหนด", "อื่นๆ"], 
+        icons=["calendar2-check", "grid-1x2"], 
+        menu_icon="cast", 
         default_index=0,
         styles={
             "container": {"padding": "5!important", "background-color": "#FAFAFA"},
             "icon": {"color": "#555", "font-size": "20px"}, 
-            "nav-link": {"font-size": "16px", "text-align": "left", "margin":"0px", "--hover-color": "#EEEEEE"},
-            "nav-link-selected": {"background-color": "#FF4B4B", "color": "white"}, # ไฮไลต์สีแดงเมื่อกดเลือก
+            # 🔥 จุดที่แก้ไข: เพิ่ม "color": "#333333" เพื่อบังคับให้ตัวหนังสือเมนูเป็นสีเข้ม
+            "nav-link": {"font-size": "16px", "text-align": "left", "margin":"0px", "--hover-color": "#EEEEEE", "color": "#333333"},
+            "nav-link-selected": {"background-color": "#FF4B4B", "color": "white"}, 
         }
     )
 
