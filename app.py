@@ -190,4 +190,31 @@ if uploaded_file is not None:
 
     # ส่วนที่ 4: แสดงผลลัพธ์
     st.markdown("---")
-    if total_records == 0
+    if total_records == 0:  # <--- เติมเครื่องหมายโคลอน : ให้แล้วครับ
+        st.error("❌ ระบบไม่สามารถอ่านข้อมูลได้ กรุณากดปุ่ม Clear และอัปโหลดไฟล์ใหม่อีกครั้ง")
+    else:
+        st.subheader(f"📊 ผลการตรวจสอบข้อมูล (อ่านข้อมูลสำเร็จ {total_records} คัน)")
+        
+        if overdue_list:
+            df_overdue = pd.DataFrame(overdue_list)
+            st.error(f"⚠️ พบรายการเกินกำหนดเวลาทั้งหมด {len(df_overdue)} รายการ")
+            
+            # จัดเรียงคอลัมน์
+            df_overdue = df_overdue[["ลำดับที่พบ", "ลำดับในเอกสาร", "ประเภท", "เลขที่ใบขน", "ชื่อผู้นำเข้า", "ทะเบียน", "วันครบกำหนด"]]
+            
+            # ซ่อนเลข Index เริ่มต้น และตั้งคอลัมน์ "ลำดับที่พบ" (1, 2, 3...) เป็นตัวนำตาราง
+            df_overdue.set_index("ลำดับที่พบ", inplace=True)
+            
+            st.dataframe(df_overdue, use_container_width=True)
+            
+            # ปรับแต่งไฟล์ดาวน์โหลด CSV ให้มีลำดับที่ถูกต้องด้วย
+            csv = df_overdue.to_csv(index=True).encode('utf-8-sig')
+            st.download_button(
+                label="📥 ดาวน์โหลดรายชื่อผู้เกินกำหนดเป็น CSV",
+                data=csv,
+                file_name=f"overdue_report_{th_day}_{th_month}_{th_year}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        else:
+            st.success(f"🟢 ไม่พบรายการที่เกินกำหนดเวลา (ทุกคันมีกำหนดออก หลังวันที่ {th_day} {th_month} {th_year})")
