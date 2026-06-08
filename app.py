@@ -199,15 +199,15 @@ if menu == "ตรวจสอบวันครบกำหนด":
 
         
 
-            # --- แทนที่ with st.spinner เดิมด้วยชุดนี้ ---
-            placeholder = st.empty()
-            with placeholder.container():
-                st.markdown('<div class="loader"></div>', unsafe_allow_html=True)
-                st.markdown('<p style="text-align:center;"><b>⏳ ระบบกำลังสแกนข้อมูล...</b></p>', unsafe_allow_html=True)
+        # --- แทนที่ with st.spinner เดิมด้วยชุดนี้ ---
+        placeholder = st.empty()
+        with placeholder.container():
+            st.markdown('<div class="loader"></div>', unsafe_allow_html=True)
+            st.markdown('<p style="text-align:center;"><b>⏳ ระบบกำลังสแกนข้อมูล...</b></p>', unsafe_allow_html=True)
 
-            # (โค้ดการอ่าน PDF ของคุณทำงานต่อจากนี้)
-            # ... หลังจากอ่าน PDF เสร็จแล้ว ให้เพิ่มบรรทัดนี้เพื่อลบวงกลมทิ้ง:
-            placeholder.empty()
+        # (โค้ดการอ่าน PDF ของคุณทำงานต่อจากนี้)
+        # ... หลังจากอ่าน PDF เสร็จแล้ว ให้เพิ่มบรรทัดนี้เพื่อลบวงกลมทิ้ง:
+        placeholder.empty()
 
             records_data = []
 
