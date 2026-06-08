@@ -4,7 +4,23 @@ import pandas as pd
 from datetime import datetime
 
 # ตั้งค่าหน้าเว็บให้แสดงผลแบบกว้างและใส่ไอคอนหน้าแท็บ
-st.set_page_config(page_title="ระบบตรวจสอบวันครบกำหนด", layout="wide", page_icon="🚗")
+st.set_page_config(page_title="ตรวจสอบวันครบกำหนด", layout="wide", page_icon="🚗")
+
+# --- 🎨 ตกแต่งปุ่ม Clear เป็นสีแดงด้วย CSS ---
+st.markdown("""
+<style>
+/* ระบุ CSS สำหรับปุ่มที่อยู่ในคอลัมน์ที่ 2 (ปุ่ม Clear) */
+div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
+    background-color: #FF4B4B !important; /* สีแดงสด */
+    color: white !important; /* ตัวอักษรสีขาว */
+    border: none !important;
+}
+div[data-testid="stHorizontalBlock"] > div:nth-child(2) button:hover {
+    background-color: #FF6B6B !important; /* สีแดงอ่อนลงเมื่อเอาเมาส์วาง */
+    color: white !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ตกแต่งส่วนหัวด้วยอิโมจิยานพาหนะต่างๆ 🚗🏍️
 st.title("🚗🏍️ ตรวจสอบวันครบกำหนด")
@@ -48,6 +64,7 @@ with col1:
 with col2:
     st.write(" ") # สร้างช่องว่างให้ปุ่มอยู่ระดับเดียวกับช่องอัปโหลด
     st.write(" ") 
+    # ปุ่ม Clear จะแสดงผลเป็นสีแดงตาม CSS ด้านบน
     st.button("🧹 Clear", on_click=clear_data, use_container_width=True)
 
 # 3. เริ่มประมวลผลไฟล์ PDF เมื่อมีการอัปโหลดเข้าสู่ระบบ
@@ -69,10 +86,15 @@ if uploaded_file is not None:
                         expiry_date_str = row[-1].strip().split('\n')[0]
                         expiry_date = datetime.strptime(expiry_date_str, "%d/%m/%Y")
                         
-                        # แยกประเภทรถตามแบรนด์หรือประเภทเพื่อใส่ไอคอนตกแต่งในตาราง
-                        vehicle_brand = row[3].upper() if row[3] else ""
+                        # --- 🚗🏍️ แก้ไขตรรกะการแยกประเภทรถให้ครอบคลุมทุกคัน ---
+                        # แปลงข้อมูลทั้งแถวเป็นข้อความดิบเพื่อสแกนหาคำค้นหา
+                        row_text_raw = " ".join([str(item) for item in row]).upper()
+                        
+                        # กำหนดค่าเริ่มต้นเป็นรถยนต์เสมอ เพื่อไม่ให้รูปภาพว่างเปล่า
                         icon = "🚗"
-                        if "WAVE" in vehicle_brand or "YAMAHA" in vehicle_brand or "รถจักรยานยน" in str(row):
+                        
+                        # สแกนหาคำที่ระบุว่าเป็นรถจักรยานยนต์ (จากแบรนด์หรือประเภทที่เจอใน PDF)
+                        if "YAMAHA" in row_text_raw or "HONDA WAVE" in row_text_raw or "WAVE" in row_text_raw or "รถจักรยานยน" in row_text_raw:
                             icon = "🏍️"
                         
                         # เงื่อนไข: วันครบกำหนด < วันที่รันระบบ (ผ่านมาแล้ว) = เกินกำหนดจริง
@@ -88,7 +110,7 @@ if uploaded_file is not None:
                     except Exception as e:
                         continue
 
-    # 4. ส่วนการแสดงผลลัพธ์ (แก้ไขจุดบั๊กข้อความซ้อนเรียบร้อยครับ)
+    # 4. ส่วนการแสดงผลลัพธ์
     st.markdown("---")
     header_text = f"📊 ผลการตรวจสอบข้อมูล (ตรวจพบพาหนะทั้งหมด {total_records} คัน)"
     st.subheader(header_text)
