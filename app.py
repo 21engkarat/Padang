@@ -175,228 +175,122 @@ if menu == "ตรวจสอบวันครบกำหนด":
         st.button("🧹 Clear", on_click=clear_data, use_container_width=True)
 
 
-    if uploaded_file is not None:
-
+if uploaded_file is not None:
         uploaded_file.seek(0)
-
         
-
         with pdfplumber.open(uploaded_file) as pdf:
-
             first_page_text = pdf.pages[0].extract_text()
-
             if not first_page_text or "รายงานยานพาหนะ" not in first_page_text.replace(' ', ''):
-
                 st.error("❌ เอกสารไม่ถูกต้อง! กรุณาอัปโหลดเอกสาร 'รายงานยานพาหนะต่างประเทศกลับออกจากราชอาณาจักร' เท่านั้น")
-
                 st.stop()
-
                 
-
         overdue_list = []
-
         total_records = 0
-
         
-
-        # --- แทนที่ with st.spinner เดิมด้วยชุดนี้ ---
+        # --- ชุดคำสั่งแสดง Loader ---
         placeholder = st.empty()
         with placeholder.container():
             st.markdown('<div class="loader"></div>', unsafe_allow_html=True)
             st.markdown('<p style="text-align:center;"><b>⏳ ระบบกำลังสแกนข้อมูล...</b></p>', unsafe_allow_html=True)
 
-        # (โค้ดการอ่าน PDF ของคุณทำงานต่อจากนี้)
-        # ... หลังจากอ่าน PDF เสร็จแล้ว ให้เพิ่มบรรทัดนี้เพื่อลบวงกลมทิ้ง:
-        placeholder.empty()
-
-            records_data = []
-
-            header_plate_x0 = 350 
-
+        # 🟢 ถอย Indent กลับมาให้ระดับเดียวกับ placeholder
+        records_data = []
+        header_plate_x0 = 350 
+        
+        with pdfplumber.open(uploaded_file) as pdf:
+            for page in pdf.pages:
+                for w in page.extract_words():
+                    if "ทะเบียน" in w['text']:
+                        header_plate_x0 = w['x0']
+                        break
+                if header_plate_x0 != 350:
+                    break 
+                    
+            for page in pdf.pages:
+                words = page.extract_words()
+                
+                current_rec_words = []
+                for w in words:
+                    text = w['text'].strip()
+                    if re.match(r'^\d{4}-\d-\d{4}-\d{5}$', text):
+                        if current_rec_words:
+                            records_data.append(current_rec_words)
+                        current_rec_words = [w]
+                    elif current_rec_words:
+                        current_rec_words.append(w)
+                        
+                if current_rec_words:
+                    records_data.append(current_rec_words)
+                    
+        for rec_words in records_data:
+            raw_text = " ".join([w['text'] for w in rec_words])
+            dec_num = rec_words[0]['text']
             
-
-            with pdfplumber.open(uploaded_file) as pdf:
-
-                for page in pdf.pages:
-
-                    for w in page.extract_words():
-
-                        if "ทะเบียน" in w['text']:
-
-                            header_plate_x0 = w['x0']
-
-                            break
-
-                    if header_plate_x0 != 350:
-
-                        break 
-
-                        
-
-                for page in pdf.pages:
-
-                    words = page.extract_words()
-
+            dates = []
+            for w in rec_words:
+                match = re.search(r'(\d{2}/\d{2}/\d{4})', w['text'])
+                if match:
+                    dates.append({'date_str': match.group(1), 'x0': w['x0']})
+            
+            due_date = ""
+            if dates:
+                rightmost_date = max(dates, key=lambda d: d['x0'])
+                due_date = rightmost_date['date_str']
+                
+            name = "ไม่ระบุ"
+            name_match = re.search(r'\d{4}-\d-\d{4}-\d{5}\s+(.*?)\s+(MALAYSIAN|THAI|\d{6,})', raw_text)
+            if name_match:
+                name = name_match.group(1).strip()
+                
+            blacklist_models = ["E300", "E200", "E250", "C200", "C250", "C300", "X70", "X50", "CX5", "CX3", "CX8", "CRV", "HRV", "BRV", "320D", "520D", "A200", "A250"]
+            potential_plates = []
+            for w in rec_words:
+                clean_text = w['text'].replace('-', '').replace(' ', '').strip().upper()
+                if any(clean_text == model for model in blacklist_models):
+                    continue
+                if re.match(r'^([A-Z]{1,3}\d{1,4}[A-Z]?|[ก-ฮ]{1,2}\d{1,4}|\d[ก-ฮ]{1,2}\d{1,4})$', clean_text):
+                    if len(clean_text) >= 2 and not clean_text.isdigit():
+                        potential_plates.append(w)
+            
+            plate = ""
+            if potential_plates:
+                best_w = min(potential_plates, key=lambda w: abs(w['x0'] - header_plate_x0))
+                plate = best_w['text']
+            
+            if not plate:
+                plate_match = re.search(r'\b([A-Z]{2,3}\s*\d{1,4}[A-Z]?)\b', raw_text)
+                if plate_match:
+                    plate = plate_match.group(1)
+                else:
+                    plate_match_th = re.search(r'([ก-ฮ]{1,2}\s*\d{1,4})', raw_text)
+                    plate = plate_match_th.group(1) if plate_match_th else "มีในเอกสาร"
                     
-
-                    current_rec_words = []
-
-                    for w in words:
-
-                        text = w['text'].strip()
-
-                        if re.match(r'^\d{4}-\d-\d{4}-\d{5}$', text):
-
-                            if current_rec_words:
-
-                                records_data.append(current_rec_words)
-
-                            current_rec_words = [w]
-
-                        elif current_rec_words:
-
-                            current_rec_words.append(w)
-
-                            
-
-                    if current_rec_words:
-
-                        records_data.append(current_rec_words)
-
-                        
-
-            for rec_words in records_data:
-
-                raw_text = " ".join([w['text'] for w in rec_words])
-
-                dec_num = rec_words[0]['text']
-
-                
-
-                dates = []
-
-                for w in rec_words:
-
-                    match = re.search(r'(\d{2}/\d{2}/\d{4})', w['text'])
-
-                    if match:
-
-                        dates.append({'date_str': match.group(1), 'x0': w['x0']})
-
-                
-
-                due_date = ""
-
-                if dates:
-
-                    rightmost_date = max(dates, key=lambda d: d['x0'])
-
-                    due_date = rightmost_date['date_str']
-
+            if due_date:
+                try:
+                    total_records += 1
+                    day_part, month_part, year_part = due_date.split('/')
+                    expiry_year_ce = int(year_part) - 543
+                    expiry_date_object = datetime(expiry_year_ce, int(month_part), int(day_part))
                     
-
-                name = "ไม่ระบุ"
-
-                name_match = re.search(r'\d{4}-\d-\d{4}-\d{5}\s+(.*?)\s+(MALAYSIAN|THAI|\d{6,})', raw_text)
-
-                if name_match:
-
-                    name = name_match.group(1).strip()
-
-                    
-
-                blacklist_models = ["E300", "E200", "E250", "C200", "C250", "C300", "X70", "X50", "CX5", "CX3", "CX8", "CRV", "HRV", "BRV", "320D", "520D", "A200", "A250"]
-
-                potential_plates = []
-
-                for w in rec_words:
-
-                    clean_text = w['text'].replace('-', '').replace(' ', '').strip().upper()
-
-                    if any(clean_text == model for model in blacklist_models):
-
-                        continue
-
-                    if re.match(r'^([A-Z]{1,3}\d{1,4}[A-Z]?|[ก-ฮ]{1,2}\d{1,4}|\d[ก-ฮ]{1,2}\d{1,4})$', clean_text):
-
-                        if len(clean_text) >= 2 and not clean_text.isdigit():
-
-                            potential_plates.append(w)
-
-                
-
-                plate = ""
-
-                if potential_plates:
-
-                    best_w = min(potential_plates, key=lambda w: abs(w['x0'] - header_plate_x0))
-
-                    plate = best_w['text']
-
-                
-
-                if not plate:
-
-                    plate_match = re.search(r'\b([A-Z]{2,3}\s*\d{1,4}[A-Z]?)\b', raw_text)
-
-                    if plate_match:
-
-                        plate = plate_match.group(1)
-
-                    else:
-
-                        plate_match_th = re.search(r'([ก-ฮ]{1,2}\s*\d{1,4})', raw_text)
-
-                        plate = plate_match_th.group(1) if plate_match_th else "มีในเอกสาร"
-
+                    icon = "🚗"
+                    if "YAMAHA" in raw_text.upper() or "WAVE" in raw_text.upper() or "รถจักรยานยน" in raw_text.replace(' ', ''):
+                        icon = "🏍️"
                         
+                    if expiry_date_object < current_date_core:
+                        overdue_list.append({
+                            "ลำดับที่พบ": str(len(overdue_list) + 1), 
+                            "ลำดับในเอกสาร": str(total_records), 
+                            "ประเภท": icon,
+                            "เลขที่ใบขน": dec_num,
+                            "ชื่อผู้นำเข้า": name[:30],
+                            "ทะเบียน": plate,
+                            "วันครบกำหนด": due_date
+                        })
+                except Exception:
+                    continue
 
-                if due_date:
-
-                    try:
-
-                        total_records += 1
-
-                        day_part, month_part, year_part = due_date.split('/')
-
-                        expiry_year_ce = int(year_part) - 543
-
-                        expiry_date_object = datetime(expiry_year_ce, int(month_part), int(day_part))
-
-                        
-
-                        icon = "🚗"
-
-                        if "YAMAHA" in raw_text.upper() or "WAVE" in raw_text.upper() or "รถจักรยานยน" in raw_text.replace(' ', ''):
-
-                            icon = "🏍️"
-
-                            
-
-                        if expiry_date_object < current_date_core:
-
-                            overdue_list.append({
-
-                                "ลำดับที่พบ": str(len(overdue_list) + 1), 
-
-                                "ลำดับในเอกสาร": str(total_records), 
-
-                                "ประเภท": icon,
-
-                                "เลขที่ใบขน": dec_num,
-
-                                "ชื่อผู้นำเข้า": name[:30],
-
-                                "ทะเบียน": plate,
-
-                                "วันครบกำหนด": due_date
-
-                            })
-
-                    except Exception:
-
-                        continue
-
+        # 🟢 ย้ายคำสั่งนี้มาไว้ด้านล่างสุด เพื่อให้ลบ Loader ทิ้งหลังจากประมวลผล PDF ทั้งหมดเสร็จสิ้น
+        placeholder.empty()
 
         st.markdown("---")
 
