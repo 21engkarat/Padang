@@ -3,21 +3,16 @@ import pdfplumber
 import pandas as pd
 import re
 from datetime import datetime
+from streamlit_option_menu import option_menu  # นำเข้าไลบรารีสร้างเมนูสวยงาม
 
-# 1. ตั้งค่าหน้าเว็บให้ "อยู่กึ่งกลาง (centered)"
+# 1. ตั้งค่าหน้าเว็บ
 st.set_page_config(page_title="ระบบตรวจสอบวันครบกำหนด", layout="centered", page_icon="🚗")
 
-# --- 🎨 ตกแต่ง UI และจัดข้อความให้อยู่กึ่งกลาง ---
+# --- 🎨 ตกแต่ง UI ทั่วไป ---
 st.markdown("""
 <style>
-/* จัดหัวข้อให้อยู่กึ่งกลาง */
-h1, h2, h3 {
-    text-align: center !important;
-}
-.stMarkdown p {
-    text-align: center;
-}
-/* ปุ่ม Clear สีแดง */
+h1, h2, h3 { text-align: center !important; }
+.stMarkdown p { text-align: center; }
 div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
     background-color: #FF4B4B !important; 
     color: white !important; 
@@ -30,20 +25,31 @@ div[data-testid="stHorizontalBlock"] > div:nth-child(2) button:hover {
 </style>
 """, unsafe_allow_html=True)
 
-# --- 📂 ระบบเมนูด้านซ้าย (Sidebar Navigation) ---
-menu = st.sidebar.radio(
-    "เลือกฟังก์ชันการทำงาน",
-    ["ตรวจสอบวันครบกำหนด", "อื่นๆ"]
-)
+# =========================================================
+# 📂 ระบบเมนูด้านซ้าย (Sidebar สไตล์ Web App)
+# =========================================================
+with st.sidebar:
+    menu = option_menu(
+        menu_title="เมนู",  # เปลี่ยนชื่อหัวข้อตามที่ต้องการ
+        options=["ตรวจสอบวันครบกำหนด", "อื่นๆ"], # รายการเมนู
+        icons=["calendar2-check", "grid-1x2"], # ใส่ไอคอน (จากเว็บ Bootstrap Icons)
+        menu_icon="cast", # ไอคอนตรงหัวข้อเมนู
+        default_index=0,
+        styles={
+            "container": {"padding": "5!important", "background-color": "#FAFAFA"},
+            "icon": {"color": "#555", "font-size": "20px"}, 
+            "nav-link": {"font-size": "16px", "text-align": "left", "margin":"0px", "--hover-color": "#EEEEEE"},
+            "nav-link-selected": {"background-color": "#FF4B4B", "color": "white"}, # ไฮไลต์สีแดงเมื่อกดเลือก
+        }
+    )
 
 # =========================================================
-# เมนูที่ 1: ตรวจสอบวันครบกำหนด (โค้ดหลักเดิม)
+# เมนูที่ 1: ตรวจสอบวันครบกำหนด
 # =========================================================
 if menu == "ตรวจสอบวันครบกำหนด":
     st.title("🚗🏍️ ตรวจสอบวันครบกำหนด")
     st.write("ระบบตรวจเช็ครายงานยานพาหนะต่างประเทศกลับออกจากราชอาณาจักรเกินกำหนดเวลา")
 
-    # --- ระบบปุ่ม Clear ---
     if "file_uploader_key" not in st.session_state:
         st.session_state["file_uploader_key"] = 0
 
@@ -55,7 +61,6 @@ if menu == "ตรวจสอบวันครบกำหนด":
         "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
     ]
 
-    # ส่วนที่ 1: เลือกวันที่ตรวจสอบ
     today = datetime.now()
     check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ", today)
 
@@ -66,7 +71,6 @@ if menu == "ตรวจสอบวันครบกำหนด":
 
     current_date_core = datetime(check_date.year, check_date.month, check_date.day)
 
-    # ส่วนที่ 2: ควบคุมการอัปโหลด
     col1, col2 = st.columns([6, 1])
     with col1:
         uploaded_file = st.file_uploader(
@@ -79,11 +83,10 @@ if menu == "ตรวจสอบวันครบกำหนด":
         st.write(" ") 
         st.button("🧹 Clear", on_click=clear_data, use_container_width=True)
 
-    # ส่วนที่ 3: ประมวลผล PDF
     if uploaded_file is not None:
         uploaded_file.seek(0)
         
-        # 🔒 ขั้นตอนการตรวจสอบความถูกต้องของประเภทไฟล์ (Validation)
+        # Validation
         with pdfplumber.open(uploaded_file) as pdf:
             first_page_text = pdf.pages[0].extract_text()
             if not first_page_text or "รายงานยานพาหนะ" not in first_page_text.replace(' ', ''):
@@ -98,7 +101,6 @@ if menu == "ตรวจสอบวันครบกำหนด":
             header_plate_x0 = 350 
             
             with pdfplumber.open(uploaded_file) as pdf:
-                # หาพิกัดคอลัมน์ "ทะเบียน"
                 for page in pdf.pages:
                     for w in page.extract_words():
                         if "ทะเบียน" in w['text']:
@@ -123,12 +125,11 @@ if menu == "ตรวจสอบวันครบกำหนด":
                     if current_rec_words:
                         records_data.append(current_rec_words)
                         
-            # ประมวลผลข้อมูลแต่ละคัน
+            # ประมวลผล
             for rec_words in records_data:
                 raw_text = " ".join([w['text'] for w in rec_words])
                 dec_num = rec_words[0]['text']
                 
-                # --- แกะวันครบกำหนด (ขวาสุด) ---
                 dates = []
                 for w in rec_words:
                     match = re.search(r'(\d{2}/\d{2}/\d{4})', w['text'])
@@ -140,20 +141,18 @@ if menu == "ตรวจสอบวันครบกำหนด":
                     rightmost_date = max(dates, key=lambda d: d['x0'])
                     due_date = rightmost_date['date_str']
                     
-                # --- แกะชื่อผู้นำเข้า ---
                 name = "ไม่ระบุ"
                 name_match = re.search(r'\d{4}-\d-\d{4}-\d{5}\s+(.*?)\s+(MALAYSIAN|THAI|\d{6,})', raw_text)
                 if name_match:
                     name = name_match.group(1).strip()
                     
-                # --- แกะทะเบียนรถ ---
                 blacklist_models = ["E300", "E200", "E250", "C200", "C250", "C300", "X70", "X50", "CX5", "CX3", "CX8", "CRV", "HRV", "BRV", "320D", "520D", "A200", "A250"]
                 potential_plates = []
                 for w in rec_words:
                     clean_text = w['text'].replace('-', '').replace(' ', '').strip().upper()
                     if any(clean_text == model for model in blacklist_models):
                         continue
-                    if re.match(r'^([A-Z]{1,3}\d{1,4}[A-Za-z]?|[ก-ฮ]{1,2}\d{1,4}|\d[ก-ฮ]{1,2}\d{1,4})$', clean_text):
+                    if re.match(r'^([A-Z]{1,3}\d{1,4}[A-Z]?|[ก-ฮ]{1,2}\d{1,4}|\d[ก-ฮ]{1,2}\d{1,4})$', clean_text):
                         if len(clean_text) >= 2 and not clean_text.isdigit():
                             potential_plates.append(w)
                 
@@ -170,7 +169,6 @@ if menu == "ตรวจสอบวันครบกำหนด":
                         plate_match_th = re.search(r'([ก-ฮ]{1,2}\s*\d{1,4})', raw_text)
                         plate = plate_match_th.group(1) if plate_match_th else "มีในเอกสาร"
                         
-                # --- เช็คสถานะวันครบกำหนด ---
                 if due_date:
                     try:
                         total_records += 1
@@ -195,7 +193,7 @@ if menu == "ตรวจสอบวันครบกำหนด":
                     except Exception:
                         continue
 
-        # ส่วนการแสดงผลลัพธ์
+        # แสดงผลลัพธ์
         st.markdown("---")
         if total_records == 0:
             st.error("❌ ระบบไม่สามารถอ่านข้อมูลได้ กรุณากดปุ่ม Clear และอัปโหลดไฟล์ใหม่อีกครั้ง")
