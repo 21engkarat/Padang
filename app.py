@@ -10,6 +10,7 @@ from datetime import datetime
 
 from streamlit_option_menu import option_menu 
 
+from zoneinfo import ZoneInfo
 
 # 1. ตั้งค่าหน้าเว็บ
 
@@ -105,7 +106,7 @@ with st.sidebar:
 
     )
 if "my_date" not in st.session_state:
-    st.session_state["my_date"] = datetime.now().date()
+    st.session_state["my_date"] = datetime.now(ZoneInfo("Asia/Bangkok")).date()
 
 # =========================================================
 
@@ -128,7 +129,7 @@ if menu == "ตรวจสอบวันครบกำหนด":
     def clear_data():
 
         st.session_state["file_uploader_key"] += 1
-        st.session_state["my_date"] = datetime.now().date()
+        st.session_state["my_date"] = datetime.now(ZoneInfo("Asia/Bangkok")).date()
 
     thai_months = [
 
@@ -139,9 +140,9 @@ if menu == "ตรวจสอบวันครบกำหนด":
     ]
 
 
-    today = datetime.now()
+    today = datetime.now(ZoneInfo("Asia/Bangkok"))
 
-    check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ", value=st.session_state.get("my_date", datetime.now().date()),key="my_date")
+    check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ", value=st.session_state.get("my_date", datetime.now(ZoneInfo("Asia/Bangkok")).date()),key="my_date")
 
 
     th_day = check_date.day
