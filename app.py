@@ -39,7 +39,7 @@ thai_months = [
 
 # 1. วันที่ตรวจสอบ
 today = datetime.now()
-check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ (💡 ทดลองเปลี่ยนเป็น ก.ย. 2569 เพื่อทดสอบแจ้งเตือน)", today)
+check_date = st.date_input("เลือกวันที่ต้องการให้ตรวจเช็คระบบ (💡 ลองเปลี่ยนเป็น 1 ก.ย. 2569 เพื่อดูแจ้งเตือนตัวแดง)", today)
 
 th_day = check_date.day
 th_month = thai_months[check_date.month - 1]
@@ -61,103 +61,108 @@ with col2:
     st.write(" ") 
     st.button("🧹 Clear", on_click=clear_data, use_container_width=True)
 
-# 3. ประมวลผล PDF ด้วย Text Scanner (แก้อาการหาข้อมูลไม่เจอ)
+# 3. ประมวลผล PDF ด้วยระบบ "วิเคราะห์พิกัดแกน X"
 if uploaded_file is not None:
     uploaded_file.seek(0)
     overdue_list = []
     total_records = 0
     
-    with st.spinner("⏳ ระบบกำลังอ่านไฟล์ PDF ด้วยโหมดสแกนข้อความขั้นสูง กรุณารอสักครู่..."):
-        raw_text_all = ""
+    with st.spinner("⏳ ระบบกำลังวิเคราะห์พิกัดตารางบนหน้ากระดาษ กรุณารอสักครู่..."):
+        records_data = []
         
-        # กวาดตัวหนังสือทั้งหมดออกมาจาก PDF
         with pdfplumber.open(uploaded_file) as pdf:
             for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    # ตัดข้อความหัวกระดาษและท้ายกระดาษทิ้ง เพื่อไม่ให้ระบบดึงวันที่พิมพ์เอกสารมาปน
-                    text = re.sub(r'กรมศุลกากร.*?\n', '', text)
-                    text = re.sub(r'รายงานยานพาหนะ.*?\n', '', text)
-                    text = re.sub(r'ด่านศุลกากร.*?\n', '', text)
-                    text = re.sub(r'ตั้งแต่วันที่.*?\n', '', text)
-                    text = re.sub(r'หน้าที่.*?\n', '', text)
-                    text = re.sub(r'วันที่ \d{2}/\d{2}/\d{4}.*?\n', '', text)
-                    text = re.sub(r'เวลา \d{2}:\d{2}:\d{2} น\..*?\n', '', text)
-                    raw_text_all += text + "\n"
-        
-        # ใช้ Regex ค้นหา "เลขที่ใบขนสินค้า" เพื่อใช้เป็นจุดตัดแยกข้อมูลรถแต่ละคัน
-        matches = list(re.finditer(r'(\d{4}-\d-\d{4}-\d{5})', raw_text_all))
-        
-        records = []
-        for i, match in enumerate(matches):
-            dec_num = match.group(1)
-            start_idx = match.end()
-            # ตัดข้อความเฉพาะช่วงของรถคันนั้นๆ (ถึงคันถัดไป)
-            end_idx = matches[i+1].start() if i+1 < len(matches) else len(raw_text_all)
+                # ดึงคำทั้งหมดพร้อมพิกัด (Bounding Box) บนหน้ากระดาษ
+                words = page.extract_words()
+                
+                current_rec_words = []
+                for w in words:
+                    text = w['text'].strip()
+                    # ใช้ "เลขใบขนสินค้า" เป็นตัวแบ่งรถแต่ละคัน (เช่น 5901-7-6905-03632)
+                    if re.match(r'^\d{4}-\d-\d{4}-\d{5}$', text):
+                        if current_rec_words:
+                            records_data.append(current_rec_words)
+                        current_rec_words = [w]
+                    elif current_rec_words:
+                        current_rec_words.append(w)
+                        
+                if current_rec_words:
+                    records_data.append(current_rec_words)
+                    
+        # ประมวลผลข้อมูลแต่ละคัน
+        for rec_words in records_data:
+            raw_text = " ".join([w['text'] for w in rec_words])
+            dec_num = rec_words[0]['text']
             
-            chunk = raw_text_all[start_idx:end_idx]
+            # 🎯 พระเอกของงาน: หา "วันครบกำหนด" โดยเช็คจากพิกัด
+            dates = []
+            for w in rec_words:
+                match = re.search(r'(\d{2}/\d{2}/\d{4})', w['text'])
+                if match:
+                    # เก็บวันที่ และ พิกัดแนวแกนขวาง (x0 คือพิกัดความไกลจากขอบซ้ายของกระดาษ)
+                    dates.append({'date_str': match.group(1), 'x0': w['x0']})
             
-            # ดึงวันที่ทั้งหมดออกมาจากบล็อกข้อมูล วันที่อันสุดท้ายคือ "วันครบกำหนด" เสมอ
-            dates = re.findall(r'(\d{2}/\d{2}/\d{4})', chunk)
-            due_date = dates[-1] if dates else ""
-            
-            # สแกนหาป้ายทะเบียนรถ (ตัวอักษรภาษาอังกฤษ/ไทย ตามด้วยตัวเลข)
-            plate_match = re.search(r'\b([A-Z]{1,3}\s*\d{1,4})\b', chunk)
-            plate = plate_match.group(1) if plate_match else ""
+            due_date = ""
+            if dates:
+                # เลือกวันที่ที่อยู่ "ขวาสุดของกระดาษ" (ค่า x0 มากที่สุด = คอลัมน์สุดท้ายแน่นอน!)
+                rightmost_date = max(dates, key=lambda d: d['x0'])
+                due_date = rightmost_date['date_str']
+                
+            # ดึงชื่อผู้นำเข้า (อยู่ระหว่างเลขใบขน กับสัญชาติ)
+            name = "ไม่ระบุ"
+            name_match = re.search(r'\d{4}-\d-\d{4}-\d{5}\s+(.*?)\s+(MALAYSIAN|THAI|\d{6,})', raw_text)
+            if name_match:
+                name = name_match.group(1).strip()
+                
+            # สแกนทะเบียนรถ
+            plate = ""
+            plate_match = re.search(r'\b([A-Z]{1,3}\s*\d{1,4})\b', raw_text)
+            if plate_match:
+                plate = plate_match.group(1)
+            else:
+                plate_match_th = re.search(r'([ก-ฮ]{1,2}\s*\d{1,4})', raw_text)
+                if plate_match_th:
+                    plate = plate_match_th.group(1)
             if not plate:
-                plate_match_th = re.search(r'([ก-ฮ]{1,2}\s*\d{1,4})', chunk)
-                plate = plate_match_th.group(1) if plate_match_th else "มีในเอกสาร"
-            
-            # สแกนหาชื่อผู้นำเข้า
-            lines = [l.strip() for l in chunk.split('\n') if l.strip()]
-            name = lines[0] if lines else "ไม่ระบุ"
-            name = re.sub(r'^\d+\s*', '', name)
-            
-            records.append({
-                "ลำดับ": str(i + 1),
-                "เลขที่ใบขน": dec_num,
-                "ชื่อผู้นำเข้า": name[:30],
-                "ทะเบียน": plate,
-                "วันครบกำหนด": due_date,
-                "raw_text": chunk
-            })
-        
-        # 4. ตรวจเช็ควันครบกำหนดเปรียบเทียบกับวันที่เลือกรันระบบ
-        for rec in records:
-            if rec["วันครบกำหนด"]:
+                plate = "มีในเอกสาร"
+                
+            if due_date:
                 try:
                     total_records += 1
-                    day_part, month_part, year_part = rec["วันครบกำหนด"].replace('-', '/').split('/')
+                    day_part, month_part, year_part = due_date.split('/')
                     expiry_year_ce = int(year_part) - 543
                     expiry_date_object = datetime(expiry_year_ce, int(month_part), int(day_part))
                     
                     icon = "🚗"
-                    if "YAMAHA" in rec["raw_text"].upper() or "WAVE" in rec["raw_text"].upper() or "รถจักรยานยน" in rec["raw_text"].replace(' ', ''):
+                    if "YAMAHA" in raw_text.upper() or "WAVE" in raw_text.upper() or "รถจักรยานยน" in raw_text.replace(' ', ''):
                         icon = "🏍️"
-                    
+                        
+                    # เช็คเงื่อนไข: วันครบกำหนด < วันปัจจุบันที่เลือกรันระบบ
                     if expiry_date_object < current_date_core:
                         overdue_list.append({
+                            "ลำดับ": str(total_records),
                             "ประเภท": icon,
-                            "ลำดับ": rec["ลำดับ"],
-                            "เลขที่ใบขน": rec["เลขที่ใบขน"],
-                            "ชื่อผู้นำเข้า": rec["ชื่อผู้นำเข้า"],
-                            "ทะเบียน": rec["ทะเบียน"],
-                            "วันครบกำหนด": rec["วันครบกำหนด"]
+                            "เลขที่ใบขน": dec_num,
+                            "ชื่อผู้นำเข้า": name[:30],
+                            "ทะเบียน": plate,
+                            "วันครบกำหนด": due_date
                         })
                 except Exception:
                     continue
 
-    # 5. แสดงผลลัพธ์
+    # 4. แสดงผลลัพธ์
     st.markdown("---")
-    
     if total_records == 0:
-        st.error("❌ ระบบยังคงอ่านไฟล์ไม่ได้ โปรดตรวจสอบว่าไฟล์ PDF มีการเข้ารหัสผ่านไว้หรือไม่")
+        st.error("❌ ระบบไม่สามารถอ่านข้อมูลได้ กรุณากดปุ่ม Clear และอัปโหลดไฟล์ใหม่อีกครั้ง")
     else:
-        st.subheader(f"📊 ผลการตรวจสอบข้อมูล (แกะข้อความสำเร็จทั้งหมด {total_records} คัน)")
+        st.subheader(f"📊 ผลการตรวจสอบข้อมูล (แกะข้อความและพิกัดสำเร็จทั้งหมด {total_records} คัน)")
         
         if overdue_list:
             df_overdue = pd.DataFrame(overdue_list)
-            st.error(f"⚠️ พบรายการเกินกำหนดเวลาทั้งหมด {len(df_overdue)} รายการ (วันครบกำหนด มาก่อนวันที่ {th_day} {th_month} {th_year})")
+            st.error(f"⚠️ พบรายการเกินกำหนดเวลาทั้งหมด {len(df_overdue)} รายการ (วันครบกำหนด มาก่อนวันที่ตรวจสอบ)")
+            
+            # จัดเรียงคอลัมน์ให้สวยงามก่อนโชว์บนหน้าเว็บ
+            df_overdue = df_overdue[["ลำดับ", "ประเภท", "เลขที่ใบขน", "ชื่อผู้นำเข้า", "ทะเบียน", "วันครบกำหนด"]]
             st.dataframe(df_overdue, use_container_width=True)
             
             csv = df_overdue.to_csv(index=False).encode('utf-8-sig')
