@@ -16,12 +16,12 @@ h1, h2, h3 { text-align: center !important; }
 
 /* ปรับปุ่ม Clear ให้มีความสูงเท่ากับช่อง file uploader */
 div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
-    height: 70px !important;
+    height: 65px !important;
     background-color: #FF4B4B !important; 
     color: white !important; 
     border: none !important;
     font-weight: bold !important;
-    margin-top: 25px; /* ปรับให้พอดีกับ label ของ uploader */
+    margin-top: 27px; /* ปรับให้พอดีกับ label ของ uploader */
 }
 div[data-testid="stHorizontalBlock"] > div:nth-child(2) button:hover {
     background-color: #FF6B6B !important; 
